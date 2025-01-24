@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Data</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+</head>
+<body>
+    <h1>Smart Irrigation System Data Visualization</h1>
+    <canvas id="sensorChart" width="400" height="200"></canvas>
+    
+    <div>
+        <label for="timeFilter">Time Filter:</label>
+        <select id="timeFilter">
+            <option value="minute">Last Minute</option>
+            <option value="hour">Last Hour</option>
+            <option value="day">Last Day</option>
+        </select>
+    </div>
+    
+    <h2>Next Water Pump Prediction</h2>
+    <p id="prediction"></p>
+    
+    <script>
+        function fetchData(timeUnit) {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    const timestamps = data.map(item => item.timestamp);
+                    const soilMoisture = data.map(item => item.soil_moisture);
+                    const rainLevel = data.map(item => item.rain_level);
+
+                    const ctx = document.getElementById('sensorChart').getContext('2d');
+                    const sensorChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: timestamps,
+                            datasets: [
+                                {
+                                    label: 'Soil Moisture',
+                                    data: soilMoisture,
+                                    borderColor: 'rgba(75, 192, 192, 1)',
+                                    borderWidth: 1,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Rain Level',
+                                    data: rainLevel,
+                                    borderColor: 'rgba(255, 99, 132, 1)',
+                                    borderWidth: 1,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            scales: {
+                                x: {
+                                    type: 'time',
+                                    time: {
+                                        unit: timeUnit
+                                    }
+                                },
+                                y: {
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    onClick: (e, legendItem, legend) => {
+                                        const index = legendItem.datasetIndex;
+                                        const ci = legend.chart;
+                                        const meta = ci.getDatasetMeta(index);
+
+                                        // See controller.isDatasetVisible comment
+                                        meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+
+                                        // We hid a dataset ... rerender the chart
+                                        ci.update();
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // Simple prediction logic for next water pump
+                    const lastSoilMoisture = soilMoisture[soilMoisture.length - 1];
+                    const prediction = lastSoilMoisture < 30 ? "Water pump will be activated soon." : "Water pump is not needed.";
+                    document.getElementById('prediction').innerText = prediction;
+                });
+        }
+
+        document.getElementById('timeFilter').addEventListener('change', (event) => {
+            const timeUnit = event.target.value;
+            fetchData(timeUnit);
+        });
+
+        // Initial fetch with default time unit
+        fetchData('minute');
+    </script>
+</body>
+</html>
